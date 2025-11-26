@@ -7,12 +7,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.map // Pastikan import map
 import kotlinx.coroutines.launch
+import java.util.Calendar
 
 class MovieViewModel(private val movieRepository: MovieRepository) : ViewModel() {
 
     // Define StateFlow sebagai pengganti LiveData
-    // MutableStateFlow adalah StateFlow yang nilainya bisa diubah
     private val _popularMovies = MutableStateFlow<List<Movie>>(emptyList())
     val popularMovies: StateFlow<List<Movie>> = _popularMovies
 
@@ -23,17 +24,28 @@ class MovieViewModel(private val movieRepository: MovieRepository) : ViewModel()
         fetchPopularMovies()
     }
 
-    // Fetch movies dari API menggunakan Flow
+    // fetch movies from the API
     private fun fetchPopularMovies() {
         viewModelScope.launch(Dispatchers.IO) {
             movieRepository.fetchMovies()
+                // --- IMPLEMENTASI FILTER DI SINI ---
+                // Operator map digunakan untuk mengubah data di dalam stream flow
+                .map { movies ->
+                    // Kita filter tahun (opsional, agar sama seperti lab sebelumnya)
+                    val currentYear = Calendar.getInstance().get(Calendar.YEAR).toString()
+
+                    movies.filter { movie ->
+                        movie.releaseDate?.startsWith(currentYear) == true
+                    }.sortedByDescending {
+                        it.popularity // Urutkan berdasarkan popularitas tertinggi
+                    }
+                }
+                // -----------------------------------
                 .catch { exception ->
-                    // catch adalah terminal operator untuk menangkap error dari Flow
                     _error.value = "An exception occurred: ${exception.message}"
                 }
                 .collect { movies ->
-                    // collect adalah terminal operator untuk mengambil nilai dari Flow
-                    // hasilnya dimasukkan ke StateFlow
+                    // Hasil di sini sudah terurut (sorted)
                     _popularMovies.value = movies
                 }
         }

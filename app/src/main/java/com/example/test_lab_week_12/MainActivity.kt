@@ -2,7 +2,6 @@ package com.example.test_lab_week_12
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModel
@@ -13,7 +12,6 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.test_lab_week_12.model.Movie
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch
-import java.util.Calendar
 
 class MainActivity : AppCompatActivity() {
 
@@ -25,9 +23,10 @@ class MainActivity : AppCompatActivity() {
 
         val recyclerView: RecyclerView = findViewById(R.id.movie_list)
 
-        // Setup Adapter
+        // 1. Setup Adapter dengan Click Listener
         movieAdapter = MovieAdapter(object : MovieAdapter.MovieClickListener {
             override fun onMovieClick(movie: Movie) {
+                // Navigasi ke DetailsActivity saat item diklik
                 val intent = Intent(this@MainActivity, DetailsActivity::class.java)
                 intent.putExtra("movie_title", movie.title)
                 intent.putExtra("movie_overview", movie.overview)
@@ -36,8 +35,10 @@ class MainActivity : AppCompatActivity() {
                 startActivity(intent)
             }
         })
+
         recyclerView.adapter = movieAdapter
 
+        // 2. Setup ViewModel
         val movieRepository = (application as MovieApplication).movieRepository
 
         val movieViewModel = ViewModelProvider(
@@ -47,28 +48,21 @@ class MainActivity : AppCompatActivity() {
                 }
             })[MovieViewModel::class.java]
 
-        // --- BAGIAN BARU: MENGGUNAKAN FLOW ---
-
-        // lifecycleScope adalah coroutine scope yang sadar lifecycle activity
+        // 3. Mengambil Data menggunakan Flow (Lifecycle Aware)
         lifecycleScope.launch {
-            // repeatOnLifecycle memastikan coroutine berjalan hanya ketika Activity minimal STARTED
-            // ini mencegah crash atau pemborosan resource saat aplikasi di background
+            // repeatOnLifecycle memastikan flow hanya dikumpulkan saat Activity minimal STARTED
             repeatOnLifecycle(Lifecycle.State.STARTED) {
 
-                // Launch coroutine pertama untuk collect popularMovies
+                // Coroutine 1: Ambil data Popular Movies
                 launch {
                     movieViewModel.popularMovies.collect { movies ->
-                        // Saat data diterima, filter dan masukkan ke adapter
-                        val currentYear = Calendar.getInstance().get(Calendar.YEAR).toString()
-                        movieAdapter.addMovies(
-                            movies.filter { movie ->
-                                movie.releaseDate?.startsWith(currentYear) == true
-                            }.sortedByDescending { it.popularity }
-                        )
+                        // Perhatikan: Tidak ada lagi logika filter/sort di sini.
+                        // Data 'movies' sudah difilter & diurutkan di ViewModel.
+                        movieAdapter.addMovies(movies)
                     }
                 }
 
-                // Launch coroutine kedua untuk collect error
+                // Coroutine 2: Ambil Error jika ada
                 launch {
                     movieViewModel.error.collect { error ->
                         if (error.isNotEmpty()) {
